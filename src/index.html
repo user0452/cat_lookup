@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>喵解</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div
+    id="floating-ball"
+    class="floating-ball"
+    title="点击：解释选中文字&#10;右键：框选区域 OCR&#10;Alt+Shift+A：切换框选模式"
+  >
+    <div class="ball-core">
+      <img
+        id="cat-sprite"
+        class="cat-sprite"
+        src="/cat/frames/idle_01.png"
+        alt=""
+        draggable="false"
+      >
+    </div>
+  </div>
+
+  <div id="panel" class="panel">
+    <div class="panel-header" id="panel-header">
+      <div class="panel-title-wrap">
+        <div class="panel-title">
+          <span class="logo">
+            <img src="/cat/frames/idle_01.png" alt="">
+          </span>
+          <span>喵解</span>
+        </div>
+        <p class="panel-subtitle">喵，我来帮你解释这段内容</p>
+      </div>
+      <div class="panel-actions">
+        <button id="btn-paste" class="icon-btn" title="读取剪贴板" aria-label="读取剪贴板">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M9 5.5h6M9.8 3.5h4.4a1 1 0 0 1 1 1v2h-6.4v-2a1 1 0 0 1 1-1Z"/>
+            <path d="M8.8 5H7a2 2 0 0 0-2 2v11.5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1.8"/>
+          </svg>
+        </button>
+        <button id="btn-settings" class="icon-btn" title="设置" aria-label="设置">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/>
+            <path d="m19 13.7 1.2.9-1.8 3.1-1.5-.6a7.5 7.5 0 0 1-2.2 1.3l-.2 1.6h-3.6l-.2-1.6a7.5 7.5 0 0 1-2.2-1.3l-1.5.6-1.8-3.1 1.2-.9a7.7 7.7 0 0 1 0-2.6l-1.2-.9L7 7.1l1.5.6a7.5 7.5 0 0 1 2.2-1.3l.2-1.6h3.6l.2 1.6a7.5 7.5 0 0 1 2.2 1.3l1.5-.6 1.8 3.1-1.2.9a7.7 7.7 0 0 1 0 2.6Z"/>
+          </svg>
+        </button>
+        <button id="btn-copy" class="icon-btn" title="复制结果" aria-label="复制结果" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="8" y="8" width="11" height="12" rx="2"/>
+            <path d="M5 16V6a2 2 0 0 1 2-2h8"/>
+          </svg>
+        </button>
+        <button id="btn-retry" class="icon-btn" title="重新解释" aria-label="重新解释" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M19.5 8.5A8 8 0 1 0 20 14"/>
+            <path d="M19.5 4.5v4h-4"/>
+          </svg>
+        </button>
+        <button id="btn-close" class="icon-btn close-btn" title="关闭" aria-label="关闭">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M7 7l10 10M17 7 7 17"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div id="panel-content" class="panel-content">
+      <div id="placeholder" class="placeholder">
+        <div class="placeholder-mark">喵</div>
+        <h1 class="placeholder-title">有什么想让我解释的吗？</h1>
+        <p class="placeholder-copy">先在其他窗口选中文字，再轻轻点一下小猫。右键小猫可以框选图片中的文字。</p>
+        <div class="placeholder-steps">
+          <div class="step-item">
+            <span class="step-index">1</span>
+            <span>选中文字</span>
+          </div>
+          <div class="step-item">
+            <span class="step-index">2</span>
+            <span>点击悬浮球</span>
+          </div>
+          <div class="step-item">
+            <span class="step-index">3</span>
+            <span>查看解释结果</span>
+          </div>
+        </div>
+        <p class="hint">快捷键 <kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd> 可切换框选模式</p>
+      </div>
+      <div id="loading" class="loading" style="display:none">
+        <div class="spinner"></div>
+        <div class="loading-copy">
+          <strong id="loading-text">正在处理...</strong>
+          <span>保持当前窗口不动，结果会自动更新</span>
+        </div>
+      </div>
+      <div id="result" class="result" style="display:none"></div>
+      <div id="error" class="error" style="display:none"></div>
+    </div>
+
+    <div id="settings-panel" class="settings-panel" style="display:none">
+      <div class="settings-group">
+        <label for="api-key">DeepSeek API Key</label>
+        <input type="password" id="api-key" placeholder="sk-..." autocomplete="off">
+      </div>
+      <div class="settings-group">
+        <label for="ocr-api-key">OCR.Space API Key</label>
+        <input type="password" id="ocr-api-key" placeholder="用于框选 OCR" autocomplete="off">
+      </div>
+      <label class="settings-consent" for="ocr-consent">
+        <input type="checkbox" id="ocr-consent">
+        <span>我同意将框选截图发送到 OCR.Space 进行文字识别。</span>
+      </label>
+      <p class="privacy-note">API Key 使用 Windows DPAPI 加密后保存在本机。选中文字解释会发送到 DeepSeek。</p>
+      <div class="settings-group">
+        <label for="answer-language">回答语言</label>
+        <select id="answer-language">
+          <option value="zh-CN">简体中文</option>
+          <option value="zh-TW">繁體中文</option>
+          <option value="en">English</option>
+          <option value="ja">日本語</option>
+          <option value="ko">한국어</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+          <option value="es">Español</option>
+          <option value="ru">Русский</option>
+        </select>
+      </div>
+      <div class="settings-group">
+        <label for="system-prompt">系统提示词</label>
+        <textarea id="system-prompt" rows="4" placeholder="留空时使用默认解释提示词"></textarea>
+      </div>
+      <div class="settings-actions">
+        <button id="btn-save-settings" class="btn-primary">保存设置</button>
+        <button id="btn-reset-prompt" class="btn-secondary">恢复默认</button>
+      </div>
+      <div id="settings-status" class="settings-status"></div>
+    </div>
+
+    <div class="panel-footer">
+      <span class="mode-indicator" id="mode-indicator">就绪</span>
+      <span class="shortcut-hint">右键 OCR · Esc 关闭 · Alt+Shift+A 切换</span>
+    </div>
+  </div>
+
+  <div id="selection-overlay" class="selection-overlay" style="display:none">
+    <div id="selection-box" class="selection-box"></div>
+    <div class="selection-hint">拖拽选择区域，右键取消</div>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
