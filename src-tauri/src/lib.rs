@@ -6,6 +6,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::load_settings,
             commands::save_settings,
+            commands::exit_app,
             commands::capture_screen_region,
             commands::ocr_image,
             commands::explain_text,

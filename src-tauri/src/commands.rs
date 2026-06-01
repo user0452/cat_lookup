@@ -84,10 +84,7 @@ fn protect_secret(secret: &str) -> Result<String, String> {
     };
 
     if protected == 0 {
-        return Err(format!(
-            "加密密钥失败: {}",
-            std::io::Error::last_os_error()
-        ));
+        return Err(format!("加密密钥失败: {}", std::io::Error::last_os_error()));
     }
 
     let encrypted = unsafe { std::slice::from_raw_parts(output.pbData, output.cbData as usize) };
@@ -136,10 +133,7 @@ fn unprotect_secret(protected: &str) -> Result<String, String> {
     };
 
     if unprotected == 0 {
-        return Err(format!(
-            "解密密钥失败: {}",
-            std::io::Error::last_os_error()
-        ));
+        return Err(format!("解密密钥失败: {}", std::io::Error::last_os_error()));
     }
 
     let decrypted = unsafe { std::slice::from_raw_parts(output.pbData, output.cbData as usize) };
@@ -208,6 +202,11 @@ pub fn save_settings(settings: Settings) -> Result<(), String> {
     let json = serde_json::to_string_pretty(&stored).map_err(|e| e.to_string())?;
     fs::write(&path, json).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[tauri::command]
+pub fn exit_app(app: tauri::AppHandle) {
+    app.exit(0);
 }
 
 // ========== 截图 ==========
@@ -284,6 +283,7 @@ struct ParsedResult {
 
 #[tauri::command]
 pub async fn ocr_image(image_data_url: String, api_key: Option<String>) -> Result<String, String> {
+    ensure_ocr_consent(&load_settings()?)?;
     let key = api_key
         .filter(|k| !k.is_empty())
         .ok_or("请先在设置中配置 OCR.Space API Key")?;
@@ -303,7 +303,7 @@ pub async fn ocr_image(image_data_url: String, api_key: Option<String>) -> Resul
             "base64Image",
             format!("data:image/png;base64,{}", base64_data),
         ),
-        ("language", "chs".to_string()),
+        ("language", "auto".to_string()),
         ("isOverlayRequired", "false".to_string()),
         ("OCREngine", "2".to_string()),
     ];
@@ -342,6 +342,14 @@ pub async fn ocr_image(image_data_url: String, api_key: Option<String>) -> Resul
     }
 
     Ok(text)
+}
+
+fn ensure_ocr_consent(settings: &Settings) -> Result<(), String> {
+    if settings.ocr_consent {
+        Ok(())
+    } else {
+        Err("使用框选 OCR 前，请在设置中勾选授权并保存".to_string())
+    }
 }
 
 // ========== DeepSeek 解释 ==========
@@ -626,7 +634,9 @@ fn snapshot_clipboard_format(
     };
     use windows_sys::Win32::System::DataExchange::METAFILEPICT;
     use windows_sys::Win32::System::Memory::{GlobalLock, GlobalSize, GlobalUnlock};
-    use windows_sys::Win32::UI::WindowsAndMessaging::{CopyImage, IMAGE_BITMAP, LR_CREATEDIBSECTION};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        CopyImage, IMAGE_BITMAP, LR_CREATEDIBSECTION,
+    };
 
     match format {
         CF_BITMAP | CF_DSPBITMAP => {
@@ -683,8 +693,7 @@ fn snapshot_clipboard_format(
                 return Err("无法备份剪贴板调色板".to_string());
             }
             let mut entries = vec![PALETTEENTRY::default(); count as usize];
-            let copied =
-                unsafe { GetPaletteEntries(handle as _, 0, count, entries.as_mut_ptr()) };
+            let copied = unsafe { GetPaletteEntries(handle as _, 0, count, entries.as_mut_ptr()) };
             if copied != count {
                 return Err("无法备份剪贴板调色板".to_string());
             }
@@ -721,8 +730,12 @@ fn restore_clipboard_snapshot(backup: &mut ClipboardBackup) -> Result<(), String
     use windows_sys::Win32::Graphics::Gdi::{
         CreatePalette, DeleteObject, LOGPALETTE, PALETTEENTRY,
     };
-    use windows_sys::Win32::System::DataExchange::{EmptyClipboard, SetClipboardData, METAFILEPICT};
-    use windows_sys::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE};
+    use windows_sys::Win32::System::DataExchange::{
+        EmptyClipboard, SetClipboardData, METAFILEPICT,
+    };
+    use windows_sys::Win32::System::Memory::{
+        GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE,
+    };
 
     let _guard = open_clipboard()?;
     if unsafe { EmptyClipboard() } == 0 {
@@ -754,7 +767,8 @@ fn restore_clipboard_snapshot(backup: &mut ClipboardBackup) -> Result<(), String
                 y_ext,
                 handle,
             } => {
-                let global = unsafe { GlobalAlloc(GMEM_MOVEABLE, std::mem::size_of::<METAFILEPICT>()) };
+                let global =
+                    unsafe { GlobalAlloc(GMEM_MOVEABLE, std::mem::size_of::<METAFILEPICT>()) };
                 if global.is_null() {
                     return Err("分配剪贴板图元文件内存失败".to_string());
                 }
@@ -818,7 +832,9 @@ fn restore_clipboard_snapshot(backup: &mut ClipboardBackup) -> Result<(), String
 #[cfg(target_os = "windows")]
 fn alloc_global_bytes(data: &[u8]) -> Result<windows_sys::Win32::Foundation::HGLOBAL, String> {
     use windows_sys::Win32::Foundation::GlobalFree;
-    use windows_sys::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE};
+    use windows_sys::Win32::System::Memory::{
+        GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE,
+    };
 
     let global = unsafe { GlobalAlloc(GMEM_MOVEABLE, data.len()) };
     if global.is_null() {
@@ -1149,6 +1165,15 @@ mod tests {
         assert!(!json.contains("ocr-secret"));
         assert!(json.contains("encrypted-a"));
         assert!(json.contains("encrypted-b"));
+    }
+
+    #[test]
+    fn requires_saved_ocr_consent() {
+        let mut settings = Settings::default();
+        assert!(ensure_ocr_consent(&settings).is_err());
+
+        settings.ocr_consent = true;
+        assert!(ensure_ocr_consent(&settings).is_ok());
     }
 
     #[cfg(target_os = "windows")]

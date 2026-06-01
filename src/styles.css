@@ -418,6 +418,7 @@ kbd {
   line-height: 1.75;
   color: var(--text-soft);
   word-break: break-word;
+  user-select: text;
 }
 
 .result h1,
@@ -505,9 +506,16 @@ kbd {
 }
 
 .settings-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding: 16px;
   border-top: 1px solid var(--line);
   background: rgba(255, 249, 247, 0.76);
+}
+
+.panel.settings-open .panel-content {
+  display: none;
 }
 
 .settings-group {
@@ -576,6 +584,11 @@ kbd {
   resize: vertical;
 }
 
+.settings-group input,
+.settings-group textarea {
+  user-select: text;
+}
+
 .settings-actions {
   display: flex;
   gap: 10px;
@@ -583,7 +596,8 @@ kbd {
 }
 
 .btn-primary,
-.btn-secondary {
+.btn-secondary,
+.btn-danger {
   min-height: 36px;
   border-radius: 8px;
   font-size: 13px;
@@ -621,6 +635,27 @@ kbd {
 .btn-secondary:hover {
   background: var(--bg-elevated);
   color: var(--text);
+}
+
+.settings-exit {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.btn-danger {
+  width: 100%;
+  border: 1px solid rgba(217, 65, 65, 0.2);
+  background: rgba(217, 65, 65, 0.05);
+  color: #b52626;
+}
+
+.btn-danger:hover {
+  background: rgba(217, 65, 65, 0.1);
+}
+
+.btn-danger:active {
+  transform: scale(0.99);
 }
 
 .settings-status {
@@ -707,7 +742,15 @@ kbd {
   width: 6px;
 }
 
+.settings-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
 .panel-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.settings-panel::-webkit-scrollbar-track {
   background: transparent;
 }
 
@@ -716,7 +759,16 @@ kbd {
   border-radius: 999px;
 }
 
+.settings-panel::-webkit-scrollbar-thumb {
+  background: rgba(42, 69, 105, 0.16);
+  border-radius: 999px;
+}
+
 .panel-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(42, 69, 105, 0.24);
+}
+
+.settings-panel::-webkit-scrollbar-thumb:hover {
   background: rgba(42, 69, 105, 0.24);
 }
 

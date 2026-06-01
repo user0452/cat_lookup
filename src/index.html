@@ -59,7 +59,7 @@
             <path d="M19.5 4.5v4h-4"/>
           </svg>
         </button>
-        <button id="btn-close" class="icon-btn close-btn" title="关闭" aria-label="关闭">
+        <button id="btn-close" class="icon-btn close-btn" title="收起面板" aria-label="收起面板">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M7 7l10 10M17 7 7 17"/>
           </svg>
@@ -92,7 +92,7 @@
         <div class="spinner"></div>
         <div class="loading-copy">
           <strong id="loading-text">正在处理...</strong>
-          <span>保持当前窗口不动，结果会自动更新</span>
+          <span>结果准备好后会自动显示</span>
         </div>
       </div>
       <div id="result" class="result" style="display:none"></div>
@@ -112,7 +112,7 @@
         <input type="checkbox" id="ocr-consent">
         <span>我同意将框选截图发送到 OCR.Space 进行文字识别。</span>
       </label>
-      <p class="privacy-note">API Key 使用 Windows DPAPI 加密后保存在本机。选中文字解释会发送到 DeepSeek。</p>
+      <p class="privacy-note">API Key 使用 Windows DPAPI 加密后保存在本机。选中文字解释会发送到 DeepSeek，框选 OCR 会自动检测图片文字语言。</p>
       <div class="settings-group">
         <label for="answer-language">回答语言</label>
         <select id="answer-language">
@@ -136,11 +136,14 @@
         <button id="btn-reset-prompt" class="btn-secondary">恢复默认</button>
       </div>
       <div id="settings-status" class="settings-status"></div>
+      <div class="settings-exit">
+        <button id="btn-exit" class="btn-danger">退出喵解</button>
+      </div>
     </div>
 
     <div class="panel-footer">
       <span class="mode-indicator" id="mode-indicator">就绪</span>
-      <span class="shortcut-hint">右键 OCR · Esc 关闭 · Alt+Shift+A 切换</span>
+      <span class="shortcut-hint">右键 OCR · Esc 收起 · Alt+Shift+A 切换</span>
     </div>
   </div>
 

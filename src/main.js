@@ -51,6 +51,7 @@ let ballHoverTriggered = false;
 let ballHoverAnimationActive = false;
 let ballHoverHoldActive = false;
 let dockedBallSide = null;
+let panelReturnDockedBallSide = null;
 let panelAnchorPosition = null;
 let panelLayout = null;
 
@@ -78,6 +79,7 @@ const $answerLanguage = document.getElementById('answer-language');
 const $systemPrompt = document.getElementById('system-prompt');
 const $btnSaveSettings = document.getElementById('btn-save-settings');
 const $btnResetPrompt = document.getElementById('btn-reset-prompt');
+const $btnExit = document.getElementById('btn-exit');
 const $settingsStatus = document.getElementById('settings-status');
 const $overlay = document.getElementById('selection-overlay');
 const $selectionBox = document.getElementById('selection-box');
@@ -144,6 +146,12 @@ function getSystemPrompt() {
   return DEFAULT_PROMPT.replace('{language}', langName);
 }
 
+function setSettingsPanelVisible(visible) {
+  $settingsPanel.style.display = visible ? 'block' : 'none';
+  $panel.classList.toggle('settings-open', visible);
+  fitPanelWindow();
+}
+
 // ========== 事件监听 ==========
 function setupEventListeners() {
   // 左键短按由 pointerup 判定。阻止浏览器 click 冒泡，避免重复执行。
@@ -182,8 +190,7 @@ function setupEventListeners() {
   // 设置按钮
   $btnSettings.addEventListener('click', () => {
     const isVisible = $settingsPanel.style.display !== 'none';
-    $settingsPanel.style.display = isVisible ? 'none' : 'block';
-    fitPanelWindow();
+    setSettingsPanelVisible(!isVisible);
   });
 
   // 保存设置
@@ -195,6 +202,15 @@ function setupEventListeners() {
     $settingsStatus.textContent = '已恢复默认提示词';
     setTimeout(() => { $settingsStatus.textContent = ''; }, 2000);
     fitPanelWindow();
+  });
+
+  // 退出应用
+  $btnExit.addEventListener('click', async () => {
+    try {
+      await invoke('exit_app');
+    } catch (e) {
+      $settingsStatus.textContent = '退出失败: ' + e;
+    }
   });
 
   // 复制结果
@@ -612,6 +628,7 @@ function setupPanelDrag() {
     if (e.button !== 0) return;
     if (e.target.closest('.icon-btn')) return;
     e.preventDefault();
+    panelReturnDockedBallSide = null;
     appWindow.startDragging().catch(err => {
       console.error('面板拖拽失败:', err);
     });
@@ -758,26 +775,27 @@ async function setPanelWindowFrame(anchorPosition, size, bounds = null) {
 function getDockedBallPosition(position, bounds) {
   const maxX = bounds.x + Math.max(0, bounds.width - BALL_WINDOW.width);
   if (position.x <= bounds.x + DOCK_EDGE_THRESHOLD) {
-    return {
-      side: 'left',
-      position: {
-        x: bounds.x - BALL_WINDOW.width + DOCK_VISIBLE_WIDTH,
-        y: position.y,
-      },
-    };
+    return getDockedBallPositionForSide(position, bounds, 'left');
   }
 
   if (position.x >= maxX - DOCK_EDGE_THRESHOLD) {
-    return {
-      side: 'right',
-      position: {
-        x: bounds.x + bounds.width - DOCK_VISIBLE_WIDTH,
-        y: position.y,
-      },
-    };
+    return getDockedBallPositionForSide(position, bounds, 'right');
   }
 
   return null;
+}
+
+function getDockedBallPositionForSide(position, bounds, side) {
+  const clamped = clampPosition(position, BALL_WINDOW, bounds);
+  return {
+    side,
+    position: {
+      x: side === 'left'
+        ? bounds.x - BALL_WINDOW.width + DOCK_VISIBLE_WIDTH
+        : bounds.x + bounds.width - DOCK_VISIBLE_WIDTH,
+      y: clamped.y,
+    },
+  };
 }
 
 function getUndockedBallPosition(position, bounds, side) {
@@ -811,6 +829,8 @@ async function setWindowFrame(position, size) {
 }
 
 async function enterBallMode({ preserveCurrentPosition = false } = {}) {
+  const dockedSideToRestore = panelReturnDockedBallSide || dockedBallSide;
+  panelReturnDockedBallSide = null;
   if (preserveCurrentPosition || !lastBallPosition) {
     lastBallPosition = await getLogicalWindowPosition();
   }
@@ -821,14 +841,18 @@ async function enterBallMode({ preserveCurrentPosition = false } = {}) {
   resetPanelLayout();
   setBodyMode('ball');
   $panel.classList.remove('is-visible');
-  $settingsPanel.style.display = 'none';
+  setSettingsPanelVisible(false);
   $overlay.style.display = 'none';
   $ball.classList.remove('active');
   $modeIndicator.textContent = '就绪';
   $modeIndicator.classList.remove('active');
 
   const bounds = await getWorkAreaBounds();
-  const position = clampPosition(lastBallPosition, BALL_WINDOW, bounds);
+  const clampedPosition = clampPosition(lastBallPosition, BALL_WINDOW, bounds);
+  const position = dockedSideToRestore
+    ? getDockedBallPositionForSide(clampedPosition, bounds, dockedSideToRestore).position
+    : clampedPosition;
+  setDockedBallSide(dockedSideToRestore);
   lastBallPosition = position;
   await setWindowFrame(position, BALL_WINDOW);
   startCatIdle();
@@ -839,11 +863,18 @@ async function enterPanelMode(positionOverride = null) {
 
   cancelBallHoverAction({ resetTriggered: true });
   stopCatAnimation();
-  clearDockedBallSide();
-  const currentPosition = positionOverride
+  const openingFromBall = currentMode !== 'panel';
+  const dockedSideToRestore = openingFromBall ? dockedBallSide : panelReturnDockedBallSide;
+  if (openingFromBall) panelReturnDockedBallSide = dockedSideToRestore;
+  let currentPosition = positionOverride
     || (currentMode === 'panel'
       ? await getCurrentPanelAnchorPosition()
       : await getLogicalWindowPosition());
+  const bounds = await getWorkAreaBounds();
+  if (openingFromBall && dockedSideToRestore) {
+    currentPosition = getUndockedBallPosition(currentPosition, bounds, dockedSideToRestore);
+  }
+  clearDockedBallSide();
   lastBallPosition = currentPosition;
 
   await appWindow.setFocusable(true);
@@ -856,7 +887,6 @@ async function enterPanelMode(positionOverride = null) {
   $modeIndicator.classList.remove('active');
 
   const initialSize = { width: PANEL_WINDOW_WIDTH, height: PANEL_MIN_WINDOW_HEIGHT };
-  const bounds = await getWorkAreaBounds();
   await setPanelWindowFrame(currentPosition, initialSize, bounds);
   await appWindow.setFocus();
   fitPanelWindow();
@@ -993,7 +1023,7 @@ async function startSelectionMode() {
 
   if (!$ocrConsent.checked) {
     showPanel();
-    showError('使用框选 OCR 前，请在设置中确认允许将截图发送到 OCR.Space。');
+    showError('使用框选 OCR 前，请在设置中勾选授权并保存，允许将截图发送到 OCR.Space。');
     return;
   }
 
@@ -1032,7 +1062,7 @@ async function startSelectionMode() {
   await appWindow.setFocusable(true);
   setBodyMode('overlay');
   $panel.classList.remove('is-visible');
-  $settingsPanel.style.display = 'none';
+  setSettingsPanelVisible(false);
   $overlay.style.display = 'block';
   $selectionBox.style.display = 'none';
   $ball.classList.add('active');
